@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/whitedevil31/atlan-backend/consumer-api-1/events"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -24,19 +25,6 @@ type SubmitResponse struct {
 }
 type FunctionStruct struct{}
 
-func (m FunctionStruct) EVENT_NAME_1(s *SubmitResponse) {
-	fmt.Println(s.FormId)
-	fmt.Println("FUNC 1 CONSUMER 1" + " ")
-}
-
-func (m FunctionStruct) EVENT_NAME_2(s *SubmitResponse) {
-	fmt.Println(s.FormId)
-	fmt.Println("FUNC 2 CONSUMER 1")
-}
-func (m FunctionStruct) EVENT_NAME_3(s *SubmitResponse) {
-	fmt.Println(s.FormId)
-	fmt.Println("FUNC 3 CONSUMER 1")
-}
 func main() {
 
 	conf := kafka.ReaderConfig{
@@ -56,11 +44,11 @@ func main() {
 			continue
 		}
 
-		functionStruct := FunctionStruct{}
-		eventName := string(m.Key)
 		data := &SubmitResponse{}
 		json.Unmarshal([]byte(m.Value), data)
-		functionCall := reflect.ValueOf(functionStruct).MethodByName(eventName)
+		events := new(events.FunctionStruct)
+
+		functionCall := reflect.ValueOf(events).MethodByName(string(m.Key))
 		functionCall.Call([]reflect.Value{reflect.ValueOf(data)})
 
 	}
