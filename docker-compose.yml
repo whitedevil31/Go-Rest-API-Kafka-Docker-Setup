@@ -13,16 +13,31 @@ services:
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - zookeeper
   producer-api:
     image: producer-api
     container_name: producer-api
     ports:
       - "8080:8080"
-  consumer-api:
-    image: consumer-api
-    container_name: consumer-api
+    depends_on:
+      - kafka
+  consumer-api-1:
+    image: consumer-api-1
+    container_name: consumer-api-1
     ports:
       - "5000:5000"
+    depends_on:
+      - kafka
+    
+  # consumer-api-2:
+  #   image: consumer-api-2
+  #   container_name: consumer-api-2
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - kafka
     
