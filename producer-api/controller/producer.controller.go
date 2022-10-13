@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/segmentio/kafka-go"
 	"github.com/whitedevil31/atlan-backend/producer-api/config"
 	"github.com/whitedevil31/atlan-backend/producer-api/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+var wg sync.WaitGroup
 
 func AddForm(w http.ResponseWriter, r *http.Request) {
 
@@ -52,10 +53,17 @@ func AddForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddResponse(w http.ResponseWriter, r *http.Request) {
+
 	c := config.GetDB()
 	addResponse := &utils.SubmitResponse{}
 	utils.ParseBody(r, addResponse)
+	ch := make(chan utils.GetEventsResponse)
+	go GetEventData(addResponse.FormId, ch)
+	wg.Add(1)
+	getEventResult := <-ch
+
 	collection := c.Database("atlan-backend").Collection("submissions")
+
 	submissionId := primitive.NewObjectID()
 	for i := 0; i < len(addResponse.Answers); i++ {
 		addResponse.Answers[i].AnswerId = primitive.NewObjectID()
@@ -73,11 +81,12 @@ func AddResponse(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	getEventResult, err := GetEventData(addResponse.FormId)
-	if err != nil {
-		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
-		return
-	}
+	//  getEventResult, err := GetEventData(addResponse.FormId)
+	// if err != nil {
+	// 	utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
+	// 	return
+	// }
+	wg.Wait()
 	result := utils.AddSubmissionResponse{}
 	eventData := getEventResult.Events
 	formDataBytes, _ := json.Marshal(insertData)
@@ -96,7 +105,7 @@ func AddResponse(w http.ResponseWriter, r *http.Request) {
 			Value: formDataBytes,
 		})
 		if kafkaError != nil {
-			fmt.Println(err)
+			fmt.Println(kafkaError)
 		} else {
 			fmt.Println("MESSAGE SENT BY PRODUCER!")
 		}
@@ -134,7 +143,7 @@ func AddEvent(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 
 }
-func GetEventData(formId primitive.ObjectID) (utils.GetEventsResponse, error) {
+func GetEventData(formId primitive.ObjectID, ch chan utils.GetEventsResponse) (utils.GetEventsResponse, error) {
 	c := config.GetDB()
 	var events []primitive.M
 	result := utils.GetEventsResponse{}
@@ -155,25 +164,29 @@ func GetEventData(formId primitive.ObjectID) (utils.GetEventsResponse, error) {
 	}
 
 	result.Events = events
+
+	ch <- result
+	wg.Done()
 	return result, nil
 }
-func GetEvents(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
 
-	formId, err := primitive.ObjectIDFromHex(vars["formId"])
-	if err != nil {
-		utils.JSONError(w, "INVALID_ID", utils.GetCode("INVALID_ID"))
-		return
-	}
-	result, err := GetEventData(formId)
-	if err != nil {
-		utils.JSONError(w, err.Error(), utils.GetCode(err.Error()))
-		return
-	}
+// func GetEvents(w http.ResponseWriter, r *http.Request) {
+// 	vars := mux.Vars(r)
 
-	res, _ := json.Marshal(result)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+// 	formId, err := primitive.ObjectIDFromHex(vars["formId"])
+// 	if err != nil {
+// 		utils.JSONError(w, "INVALID_ID", utils.GetCode("INVALID_ID"))
+// 		return
+// 	}
+// 	result, err := GetEventData(formId)
+// 	if err != nil {
+// 		utils.JSONError(w, err.Error(), utils.GetCode(err.Error()))
+// 		return
+// 	}
 
-}
+// 	res, _ := json.Marshal(result)
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write(res)
+
+// }
