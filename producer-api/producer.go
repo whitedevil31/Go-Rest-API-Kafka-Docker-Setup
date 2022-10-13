@@ -86,7 +86,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/whitedevil31/atlan-backend/producer-api/routes"
@@ -96,7 +95,7 @@ func main() {
 	r := mux.NewRouter()
 	routes.RegisterStudentRoutes(r)
 	http.Handle("/", r)
-	host := ":" + os.Getenv("PORT")
+	host := "localhost:8080"
 	fmt.Println("APP RUNNING ON " + host)
 	http.ListenAndServe(host, r)
 

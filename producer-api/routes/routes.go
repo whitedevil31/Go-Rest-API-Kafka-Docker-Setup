@@ -11,5 +11,5 @@ var RegisterStudentRoutes = func(router *mux.Router) {
 	mainRouter.HandleFunc("/add_form", producerController.AddForm).Methods("POST")
 	mainRouter.HandleFunc("/submit_form", producerController.AddResponse).Methods("POST")
 	mainRouter.HandleFunc("/add_event", producerController.AddEvent).Methods("POST")
-	//mainRouter.HandleFunc("/get_events/{formId}", producerController.GetEvents).Methods("GET")
+	mainRouter.HandleFunc("/get_events/{formId}", producerController.GetEvents).Methods("GET")
 }

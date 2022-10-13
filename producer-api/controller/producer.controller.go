@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	"github.com/segmentio/kafka-go"
 	"github.com/whitedevil31/atlan-backend/producer-api/config"
 	"github.com/whitedevil31/atlan-backend/producer-api/utils"
@@ -80,12 +82,6 @@ func AddResponse(w http.ResponseWriter, r *http.Request) {
 		return
 
 	}
-
-	//  getEventResult, err := GetEventData(addResponse.FormId)
-	// if err != nil {
-	// 	utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
-	// 	return
-	// }
 	wg.Wait()
 	result := utils.AddSubmissionResponse{}
 	eventData := getEventResult.Events
@@ -170,23 +166,37 @@ func GetEventData(formId primitive.ObjectID, ch chan utils.GetEventsResponse) (u
 	return result, nil
 }
 
-// func GetEvents(w http.ResponseWriter, r *http.Request) {
-// 	vars := mux.Vars(r)
+func GetEvents(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	c := config.GetDB()
+	formId, err := primitive.ObjectIDFromHex(vars["formId"])
+	if err != nil {
+		utils.JSONError(w, "INVALID_ID", utils.GetCode("INVALID_ID"))
+		return
+	}
+	var events []primitive.M
+	result := utils.GetEventsResponse{}
+	collection := c.Database("atlan-backend").Collection("events")
+	cursor, addEventError := collection.Find(context.Background(), bson.D{{Key: "formId", Value: formId}})
+	if addEventError != nil {
+		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
+		return
 
-// 	formId, err := primitive.ObjectIDFromHex(vars["formId"])
-// 	if err != nil {
-// 		utils.JSONError(w, "INVALID_ID", utils.GetCode("INVALID_ID"))
-// 		return
-// 	}
-// 	result, err := GetEventData(formId)
-// 	if err != nil {
-// 		utils.JSONError(w, err.Error(), utils.GetCode(err.Error()))
-// 		return
-// 	}
+	} else {
+		addEventError = cursor.All(context.Background(), &events)
 
-// 	res, _ := json.Marshal(result)
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write(res)
+		if addEventError != nil {
 
-// }
+			utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
+			return
+
+		}
+
+	}
+	result.Events = events
+	res, _ := json.Marshal(result)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+
+}
