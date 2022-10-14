@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
-
 	"github.com/segmentio/kafka-go"
 	"github.com/whitedevil31/atlan-backend/producer-api/config"
+	"github.com/whitedevil31/atlan-backend/producer-api/logger"
 	"github.com/whitedevil31/atlan-backend/producer-api/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -40,12 +40,14 @@ func AddForm(w http.ResponseWriter, r *http.Request) {
 		Questions:       addForm.Questions,
 	})
 	if AddFormsError != nil {
+		logger.ErrorLogger.Println("ERROR IN ADDING FORM")
 		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
 		return
 
 	}
 	result := utils.AddFormResponse{}
 	result.Message = "Form added successfullly!"
+	logger.InfoLogger.Println("FORM ADDED " + "FORM ID " + result.FormId.Hex())
 	result.FormId = formId
 	res, _ := json.Marshal(result)
 	w.Header().Set("Content-Type", "application/json")
@@ -78,6 +80,7 @@ func AddResponse(w http.ResponseWriter, r *http.Request) {
 	_, AddSubmissionError := collection.InsertOne(context.Background(), insertData)
 
 	if AddSubmissionError != nil {
+		logger.ErrorLogger.Println("ERROR IN ADDING RESPONSE")
 		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
 		return
 
@@ -87,26 +90,26 @@ func AddResponse(w http.ResponseWriter, r *http.Request) {
 	eventData := getEventResult.Events
 	formDataBytes, _ := json.Marshal(insertData)
 	kafkaWriter := &kafka.Writer{
-		Addr:  kafka.TCP("kafka:9092"),
-		Topic: "POST_FORM_SUBMIT",
+		Addr:  kafka.TCP(os.Getenv("KAFKA_BROKER")),
+		Topic: os.Getenv("TOPIC"),
 	}
 	for _, item := range eventData {
 		eventName, ok := item["eventName"].(string)
-		fmt.Println(eventName + "FROM PRODUCER")
+
 		if !ok {
-			fmt.Println("ERROR!")
+			logger.ErrorLogger.Println("ERROR IN SENDING EVENTS TO KAFKA")
 		}
 		kafkaError := kafkaWriter.WriteMessages(context.Background(), kafka.Message{
 			Key:   []byte(eventName),
 			Value: formDataBytes,
 		})
 		if kafkaError != nil {
-			fmt.Println(kafkaError)
+			logger.ErrorLogger.Println(kafkaError)
 		} else {
-			fmt.Println("MESSAGE SENT BY PRODUCER!")
+			logger.InfoLogger.Println("MESSAGE SENT FROM PRODUCER FOR RESPONSE " + result.SubmissionId.Hex())
 		}
 	}
-
+	logger.InfoLogger.Println("RESPONSE ADDED " + "RESPONSE ID" + result.SubmissionId.Hex())
 	result.Message = "Response added successfullly!"
 	result.SubmissionId = submissionId
 	res, _ := json.Marshal(result)
@@ -127,12 +130,14 @@ func AddEvent(w http.ResponseWriter, r *http.Request) {
 		EventName: addEvent.EventName,
 	})
 	if addEventError != nil {
+		logger.ErrorLogger.Println("ERROR IN ADDING EVENT TO FORM" + addEvent.FormId.Hex())
 		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
 		return
 
 	}
 	result := utils.AddEventResponse{}
 	result.Message = "Event added successfullly!"
+	logger.InfoLogger.Println("EVENT ADDED TO FORM" + addEvent.FormId.Hex())
 	res, _ := json.Marshal(result)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -144,20 +149,22 @@ func GetEventData(formId primitive.ObjectID, ch chan utils.GetEventsResponse) (u
 	var events []primitive.M
 	result := utils.GetEventsResponse{}
 	collection := c.Database("atlan-backend").Collection("events")
-	cursor, addEventError := collection.Find(context.Background(), bson.D{{Key: "formId", Value: formId}})
-	if addEventError != nil {
+	cursor, getEventError := collection.Find(context.Background(), bson.D{{Key: "formId", Value: formId}})
+	if getEventError != nil {
+		logger.ErrorLogger.Println("ERROR IN FETCHING EVENTS FOR FORM ID " + formId.Hex())
 		return result, errors.New("SOMETHING_WENT_WRONG")
 
 	} else {
-		addEventError = cursor.All(context.Background(), &events)
+		getEventError = cursor.All(context.Background(), &events)
 
-		if addEventError != nil {
-
+		if getEventError != nil {
+			logger.ErrorLogger.Println("SOMETHING WENT WRONG")
 			return result, errors.New("SOMETHING_WENT_WRONG")
 
 		}
 
 	}
+	logger.InfoLogger.Println("EVENTS FETCHED FOR FORM ID " + formId.Hex())
 
 	result.Events = events
 
@@ -171,28 +178,32 @@ func GetEvents(w http.ResponseWriter, r *http.Request) {
 	c := config.GetDB()
 	formId, err := primitive.ObjectIDFromHex(vars["formId"])
 	if err != nil {
+		logger.ErrorLogger.Println("INVALID FORM ID " + formId.Hex())
 		utils.JSONError(w, "INVALID_ID", utils.GetCode("INVALID_ID"))
 		return
 	}
 	var events []primitive.M
 	result := utils.GetEventsResponse{}
 	collection := c.Database("atlan-backend").Collection("events")
-	cursor, addEventError := collection.Find(context.Background(), bson.D{{Key: "formId", Value: formId}})
-	if addEventError != nil {
+	cursor, getEventError := collection.Find(context.Background(), bson.D{{Key: "formId", Value: formId}})
+	if getEventError != nil {
+		logger.ErrorLogger.Println("ERROR IN FETCHING EVENTS FOR FORM ID " + formId.Hex())
 		utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
 		return
 
 	} else {
-		addEventError = cursor.All(context.Background(), &events)
+		getEventError = cursor.All(context.Background(), &events)
 
-		if addEventError != nil {
-
+		if getEventError != nil {
+			logger.ErrorLogger.Println("SOMETHING WENT WRONG")
 			utils.JSONError(w, "SOMETHING_WENT_WRONG", utils.GetCode("SOMETHING_WENT_WRONG"))
 			return
 
 		}
 
 	}
+	logger.InfoLogger.Println("EVENTS FETCHED FOR FORM ID " + formId.Hex())
+
 	result.Events = events
 	res, _ := json.Marshal(result)
 	w.Header().Set("Content-Type", "application/json")

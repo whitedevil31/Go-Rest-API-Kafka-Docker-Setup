@@ -2,9 +2,10 @@ package config
 
 import (
 	"context"
-	"fmt"
+
 	"os"
 
+	"github.com/whitedevil31/atlan-backend/producer-api/logger"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -18,11 +19,11 @@ func Connect() *mongo.Client {
 	clientOptions := options.Client().ApplyURI(db)
 	connectDB, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		fmt.Println(err)
+		logger.WarningLogger.Println("FAILED TO CONNECT TO DATABASE")
 	}
 
 	client = connectDB
-	fmt.Println("Database connected")
+	logger.InfoLogger.Println("CONNECTED  TO DATABASE")
 	return client
 }
 func GetDB() *mongo.Client {
