@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"reflect"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/whitedevil31/atlan-backend/consumer-api-1/events"
+	"github.com/whitedevil31/atlan-backend/consumer-api-1/logger"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -28,22 +28,18 @@ type FunctionStruct struct{}
 func main() {
 
 	conf := kafka.ReaderConfig{
-		GroupTopics: []string{"POST_FORM_SUBMIT"},
-		Brokers:     []string{"kafka:9092"},
-		GroupID:     "GROUP1",
+		GroupTopics: []string{os.Getenv("TOPIC")},
+		Brokers:     []string{os.Getenv("BROKER")},
+		GroupID:     os.Getenv("GROUP_ID"),
 		MaxBytes:    100,
 	}
-	fmt.Println(os.Getenv("MONGO"))
 	reader := kafka.NewReader(conf)
 	for {
-
-		fmt.Println("WAITING CONSUMER 1.....")
 		m, err := reader.ReadMessage(context.Background())
 		if err != nil {
-			fmt.Print(err.Error())
-			continue
+			logger.ErrorLogger.Println("FAILED TO INITIATE KAFKA CONSUMER")
 		}
-
+		logger.InfoLogger.Println("CONSUMED " + string(m.Key) + " EVENT")
 		data := &SubmitResponse{}
 		json.Unmarshal([]byte(m.Value), data)
 		events := new(events.FunctionStruct)

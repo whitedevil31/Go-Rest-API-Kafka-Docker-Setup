@@ -2,33 +2,17 @@ package events
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"encoding/json"
+
 	"os"
 	"time"
 
 	"github.com/mailgun/mailgun-go/v4"
+	"github.com/whitedevil31/atlan-backend/consumer-api-1/logger"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
-
-var (
-	WarningLogger *log.Logger
-	InfoLogger    *log.Logger
-	ErrorLogger   *log.Logger
-)
-
-func init() {
-	file, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
-}
 
 type SubmitResponse struct {
 	FormId    primitive.ObjectID `bson:"formId" json:"formId" `
@@ -54,16 +38,24 @@ func (m FunctionStruct) SEND_EMAIL(data interface{}) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	resp, id, err := mg.Send(ctx, message)
+	_, id, err := mg.Send(ctx, message)
 
 	if err != nil {
-		log.Fatal(err)
+		logger.ErrorLogger.Println("SEND EMAIL FUNCTION FAILED !")
 	}
 
-	fmt.Printf("ID: %s Resp: %s\n", id, resp)
+	logger.InfoLogger.Printf("SUBMISSION RESULT EMAILED ! | ID = %s", id)
 
 }
 func (m FunctionStruct) ADD_DATA_TO_SHEET(data interface{}) {
+	bytesData, _ := json.Marshal(data)
+	eventInfo := &SubmitResponse{}
+	json.Unmarshal(bytesData, eventInfo)
+	var vr sheets.ValueRange
+	myval := []interface{}{}
+	for i := 0; i < len(eventInfo.Answers); i++ {
+		myval = append(myval, eventInfo.Answers[i].AnswerText)
+	}
 	const (
 		secret = "./final.json"
 	)
@@ -73,17 +65,17 @@ func (m FunctionStruct) ADD_DATA_TO_SHEET(data interface{}) {
 	srv, err := sheets.NewService(ctx, option.WithCredentialsFile(secret), option.WithScopes(sheets.SpreadsheetsScope))
 
 	if err != nil {
-		log.Fatalf("Unable to retrieve Sheets Client %v", err)
+		logger.ErrorLogger.Println("SHEET SERVICE CANNOT BE INITIATED!")
 	}
-	var vr sheets.ValueRange
-	myval := []interface{}{"One", "Two", "Three"}
+
 	vr.Values = append(vr.Values, myval)
 	spreadsheetId := os.Getenv("SPREADSHEET_ID")
 	readRange := os.Getenv("SPREADSHEET_RANGE")
-	_, errT := srv.Spreadsheets.Values.Append(spreadsheetId, readRange, &vr).ValueInputOption("RAW").Do()
+	sheetData, errT := srv.Spreadsheets.Values.Append(spreadsheetId, readRange, &vr).ValueInputOption("RAW").Do()
 	if errT != nil {
-		fmt.Println(errT)
+		logger.ErrorLogger.Println("FAILED TO ADD DATA TO SHEETS")
 	}
-	log.Println("PUSHED")
+
+	logger.InfoLogger.Println("ADDED DATA TO ROW " + sheetData.Updates.UpdatedRange)
 
 }

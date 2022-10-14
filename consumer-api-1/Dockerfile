@@ -4,12 +4,15 @@ WORKDIR /app
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
-ENV MONGO=
 ENV MAILER_DOMAIN=
 ENV MAILER_KEY=
 ENV MAILER_ID=
 ENV SPREADSHEET_ID=
 ENV SPREADSHEET_RANGE=
+ENV GROUP_ID=
+ENV BROKER=
+ENV TOPIC=
 COPY . .
 RUN go build -mod=mod consumer.go
+EXPOSE 5000
 CMD ["./consumer"]
