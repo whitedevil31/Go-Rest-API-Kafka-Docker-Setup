@@ -33,11 +33,11 @@ services:
     depends_on:
       - kafka
     
-  # consumer-api-2:
-  #   image: consumer-api-2
-  #   container_name: consumer-api-2
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - kafka
+  consumer-api-2:
+    image: consumer-api-2
+    container_name: consumer-api-2
+    ports:
+      - "3000:3000"
+    depends_on:
+      - kafka
     
