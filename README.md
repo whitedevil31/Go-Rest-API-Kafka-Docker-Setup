@@ -29,6 +29,13 @@ The logic should be designed in such a way thgat the upcoming triggers should be
     Kafka -To handle event triggers
     Docker to containerize the application
 
+## HOW TO RUN
+   
+   A simple `docker compose up` will bring the containers up using the Dockerfile present at the root directory . Prior to that make sure 
+   you fill in necessary ENV in the Dockerfile of the 2 consumers and the 1 producer . Check the sampleDockerFile folder for dummy ENV to have 
+   an idea . Docker compose up should essentially bring 5 up containers (Zookeeper , consumer-1 ,consumer-2,producer-1,kafka)
+   
+   
 
 # SOLVING TASK #1
 So initially when creating a form we will add all the questions which are to be required in the
